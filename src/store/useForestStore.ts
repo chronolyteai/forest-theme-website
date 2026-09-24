@@ -11,21 +11,21 @@ interface BurstEvent {
 interface ForestState {
   loadingProgress: number;
   isLoaded: boolean;
-  scrollProgress: number; // 0 to 1 across all 4 sections
-  currentSection: number; // 0: Hero, 1: About, 2: Features, 3: CTA
+  scrollProgress: number;
+  currentSection: number;
   isMuted: boolean;
-  audioEnergy: number; // 0 to 1, rhythmic pulse for the spirit orb & vignette
+  audioEnergy: number;
   mouse: {
     x: number; // -1 to 1
     y: number; // -1 to 1
     rawX: number;
     rawY: number;
   };
-  hoveredTree: boolean;
+  mouse3D: [number, number, number];
   burstEvent: BurstEvent | null;
-  screenShake: number; // decayed in render loop
-  isContactModalOpen: boolean;
-  qualityTier: 'high' | 'medium' | 'low';
+  cameraFov: number;
+  screenShake: number;
+  isMobile: boolean;
 
   // Actions
   setLoadingProgress: (val: number | ((prev: number) => number)) => void;
@@ -34,14 +34,14 @@ interface ForestState {
   setCurrentSection: (section: number) => void;
   toggleMute: () => void;
   setIsMuted: (muted: boolean) => void;
-  setAudioEnergy: (energy: number) => void;
+  setAudioEnergy: (val: number) => void;
   setMouse: (x: number, y: number, rawX?: number, rawY?: number) => void;
-  setHoveredTree: (hovered: boolean) => void;
+  setMouse3D: (pos: [number, number, number]) => void;
   triggerBurst: (x?: number, y?: number, z?: number) => void;
   triggerScreenShake: (amount?: number) => void;
   decayScreenShake: (delta: number) => void;
-  setContactModalOpen: (open: boolean) => void;
-  setQualityTier: (tier: 'high' | 'medium' | 'low') => void;
+  setCameraFov: (fov: number) => void;
+  setIsMobile: (mobile: boolean) => void;
 }
 
 export const useForestStore = create<ForestState>((set, get) => ({
@@ -52,11 +52,11 @@ export const useForestStore = create<ForestState>((set, get) => ({
   isMuted: true,
   audioEnergy: 0.35,
   mouse: { x: 0, y: 0, rawX: 0, rawY: 0 },
-  hoveredTree: false,
+  mouse3D: [0, 2, -6],
   burstEvent: null,
+  cameraFov: 35,
   screenShake: 0,
-  isContactModalOpen: false,
-  qualityTier: 'high',
+  isMobile: false,
 
   setLoadingProgress: (val) =>
     set((state) => ({
@@ -67,7 +67,6 @@ export const useForestStore = create<ForestState>((set, get) => ({
 
   setScrollProgress: (progress) => {
     const clamped = Math.max(0, Math.min(1, progress));
-    // Determine section (0..3)
     let section = 0;
     if (clamped >= 0.75) section = 3;
     else if (clamped >= 0.45) section = 2;
@@ -76,21 +75,18 @@ export const useForestStore = create<ForestState>((set, get) => ({
 
     const prevSection = get().currentSection;
     if (section !== prevSection) {
-      // Trigger subtle cinematic screen shake when entering a new section
-      set({ screenShake: 0.35, currentSection: section });
+      // Subtle FOV push (35 -> 32 -> 35) on section transition
+      set({ cameraFov: 32, screenShake: 0.25, currentSection: section });
+      setTimeout(() => set({ cameraFov: 35 }), 600);
+    } else {
+      set({ scrollProgress: clamped, currentSection: section });
     }
-
-    set({ scrollProgress: clamped, currentSection: section });
   },
 
   setCurrentSection: (section) => set({ currentSection: section }),
-
   toggleMute: () => set((state) => ({ isMuted: !state.isMuted })),
-
   setIsMuted: (muted) => set({ isMuted: muted }),
-
-  setAudioEnergy: (energy) => set({ audioEnergy: energy }),
-
+  setAudioEnergy: (val) => set({ audioEnergy: val }),
   setMouse: (x, y, rawX, rawY) =>
     set((state) => ({
       mouse: {
@@ -100,10 +96,8 @@ export const useForestStore = create<ForestState>((set, get) => ({
         rawY: rawY !== undefined ? rawY : state.mouse.rawY,
       },
     })),
-
-  setHoveredTree: (hovered) => set({ hoveredTree: hovered }),
-
-  triggerBurst: (x = 0, y = 2, z = -5) =>
+  setMouse3D: (pos) => set({ mouse3D: pos }),
+  triggerBurst: (x = 0, y = 2, z = -6) =>
     set({
       burstEvent: {
         x,
@@ -113,16 +107,12 @@ export const useForestStore = create<ForestState>((set, get) => ({
         id: Math.random(),
       },
     }),
-
-  triggerScreenShake: (amount = 0.4) => set({ screenShake: amount }),
-
+  triggerScreenShake: (amount = 0.3) => set({ screenShake: amount }),
   decayScreenShake: (delta) =>
     set((state) => {
       if (state.screenShake <= 0.001) return { screenShake: 0 };
-      return { screenShake: Math.max(0, state.screenShake - delta * 2.2) };
+      return { screenShake: Math.max(0, state.screenShake - delta * 2.0) };
     }),
-
-  setContactModalOpen: (open) => set({ isContactModalOpen: open }),
-
-  setQualityTier: (tier) => set({ qualityTier: tier }),
+  setCameraFov: (fov) => set({ cameraFov: fov }),
+  setIsMobile: (mobile) => set({ isMobile: mobile }),
 }));

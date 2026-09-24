@@ -10,7 +10,6 @@ import { CtaSection } from '@/components/ui/CtaSection';
 import { GrowingVineScroll } from '@/components/ui/GrowingVineScroll';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { CustomCursor } from '@/components/ui/CustomCursor';
-import { AudioController } from '@/components/ui/AudioController';
 import { useForestStore } from '@/store/useForestStore';
 
 // Dynamically import Three.js Canvas with SSR disabled to prevent hydration mismatch
@@ -22,6 +21,7 @@ const ForestCanvas = dynamic(
 export default function Home() {
   const setScrollProgress = useForestStore((s) => s.setScrollProgress);
   const screenShake = useForestStore((s) => s.screenShake);
+  const decayScreenShake = useForestStore((s) => s.decayScreenShake);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Sync scroll progress smoothly
@@ -48,14 +48,30 @@ export default function Home() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [setScrollProgress]);
 
+  // Decay shake loop
+  useEffect(() => {
+    let animId: number;
+    let lastTime = performance.now();
+
+    const loop = (now: number) => {
+      const delta = (now - lastTime) * 0.001;
+      lastTime = now;
+      decayScreenShake(delta);
+      animId = requestAnimationFrame(loop);
+    };
+
+    animId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(animId);
+  }, [decayScreenShake]);
+
   // Subtle DOM screen shake during section threshold transitions
-  const shakeX = screenShake > 0.01 ? (Math.random() - 0.5) * screenShake * 10 : 0;
-  const shakeY = screenShake > 0.01 ? (Math.random() - 0.5) * screenShake * 8 : 0;
+  const shakeX = screenShake > 0.01 ? (Math.sin(performance.now() * 0.05) * screenShake * 6) : 0;
+  const shakeY = screenShake > 0.01 ? (Math.cos(performance.now() * 0.04) * screenShake * 4) : 0;
 
   return (
     <main
       ref={containerRef}
-      className="relative min-h-[400vh] bg-[#030d08] text-white overflow-x-hidden"
+      className="relative min-h-[400vh] bg-[#0a1f1a] text-[#e8dcc4] overflow-x-hidden"
       style={{
         transform: screenShake > 0.01 ? `translate3d(${shakeX}px, ${shakeY}px, 0)` : undefined,
       }}
@@ -63,30 +79,21 @@ export default function Home() {
       {/* 3D WebGL Canvas Layer (Fixed full screen background) */}
       <ForestCanvas />
 
-      {/* Film Grain Texture Overlay */}
-      <div className="cinematic-grain" />
-
-      {/* Deep Forest Vignette Shadow */}
-      <div className="cinematic-vignette" />
-
-      {/* Web Audio Engine Controller */}
-      <AudioController />
-
-      {/* Custom Spore Trail Cursor */}
+      {/* Custom 8px Dot + 40px Trailing Ring Cursor with mix-blend-mode: screen */}
       <CustomCursor />
 
       {/* Growing Organic Vine Scroll Indicator */}
       <GrowingVineScroll />
 
-      {/* Glassmorphic Navigation Bar */}
+      {/* Glassmorphic Navbar that slides in on scroll-up */}
       <Navbar />
 
       {/* Story Sections (Scroll-Driven Journey) */}
       <div className="relative z-20 w-full">
-        {/* Section 01: Hero — "Enter the Wild" */}
+        {/* Section 01: Hero — "ENTER THE WILD" */}
         <HeroSection />
 
-        {/* Section 02: About — "The Living Sanctuary" */}
+        {/* Section 02: About — "The Living Stream" */}
         <AboutSection />
 
         {/* Section 03: Features — "Echoes of the Canopy" */}
@@ -96,7 +103,7 @@ export default function Home() {
         <CtaSection />
       </div>
 
-      {/* Initial Asset Loading Screen */}
+      {/* Cinematic Gold-Line Tree Drawing Loading Screen */}
       <LoadingScreen />
     </main>
   );

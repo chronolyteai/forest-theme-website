@@ -5,26 +5,26 @@ import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { MeshReflectorMaterial } from '@react-three/drei';
 import { getRiverCenter, getRiverWidth } from '@/utils/noise';
+import { glslNoise3D } from '@/utils/noise';
 
 /**
  * ReflectiveStream:
- * A shallow, winding mountain river with real-time screen-space reflections
- * powered by Drei's MeshReflectorMaterial.
- *
- * - Geometrically carved to follow procedural river curvature
- * - Animated procedural ripple normal map for realistic dynamic water distortion
- * - Reflects the ancient canopy, volumetric god rays, and the celestial spirit creature
+ * - MeshReflectorMaterial with roughness 0.05, resolution 1024, distortion via normal map scroll
+ * - Soft alpha-blended shoreline foam shader along water edges
+ * - Subtle animated caustics projected onto the stream bed
  */
 export function ReflectiveStream() {
   const meshRef = useRef<THREE.Mesh>(null);
   const normalMapRef = useRef<THREE.CanvasTexture | null>(null);
+  const foamMaterialRef = useRef<THREE.ShaderMaterial>(null);
+  const causticsMaterialRef = useRef<THREE.ShaderMaterial>(null);
 
-  // Generate procedural ribbon geometry for the winding river
-  const { geometry, normalCanvas, normalCtx } = useMemo(() => {
-    const segmentsZ = 120;
+  // Generate stream ribbon, shoreline foam geometry, and riverbed caustics plane
+  const { streamGeometry, leftFoamGeom, rightFoamGeom, bedGeometry, normalCanvas, normalCtx } = useMemo(() => {
+    const segmentsZ = 130;
     const segmentsX = 14;
     const startZ = 28;
-    const endZ = -50;
+    const endZ = -52;
     const length = startZ - endZ;
 
     const geom = new THREE.BufferGeometry();
@@ -32,21 +32,38 @@ export function ReflectiveStream() {
     const uvs: number[] = [];
     const indices: number[] = [];
 
+    // Left and right shoreline foam ribbons
+    const leftFoamPos: number[] = [];
+    const rightFoamPos: number[] = [];
+    const foamUvs: number[] = [];
+    const foamIndices: number[] = [];
+
     for (let j = 0; j <= segmentsZ; j++) {
       const v = j / segmentsZ;
       const z = startZ - v * length;
-      const centerX = getRiverCenter(z);
-      const width = getRiverWidth(z) * 1.05;
+      const cX = getRiverCenter(z);
+      const w = getRiverWidth(z) * 1.05;
 
       for (let i = 0; i <= segmentsX; i++) {
         const u = i / segmentsX;
-        const x = centerX + (u - 0.5) * 2 * width;
-        // Water surface rests at y = 0.0, with subtle bank tuck
-        const y = 0.02 - Math.pow(Math.abs(u - 0.5) * 2, 4) * 0.05;
-
+        const x = cX + (u - 0.5) * 2 * w;
+        const y = 0.02 - Math.pow(Math.abs(u - 0.5) * 2, 4) * 0.04;
         positions.push(x, y, z);
-        uvs.push(u, v * 8); // Repeat UVs along length for fine ripples
+        uvs.push(u, v * 12);
       }
+
+      // Shoreline foam points (width 0.45)
+      // Left bank
+      const leftOuterX = cX - w - 0.25;
+      const leftInnerX = cX - w + 0.35;
+      leftFoamPos.push(leftOuterX, 0.06, z, leftInnerX, 0.02, z);
+
+      // Right bank
+      const rightInnerX = cX + w - 0.35;
+      const rightOuterX = cX + w + 0.25;
+      rightFoamPos.push(rightInnerX, 0.02, z, rightOuterX, 0.06, z);
+
+      foamUvs.push(0, v * 24, 1, v * 24);
     }
 
     const rowWidth = segmentsX + 1;
@@ -56,10 +73,15 @@ export function ReflectiveStream() {
         const b = (j + 1) * rowWidth + i;
         const c = (j + 1) * rowWidth + (i + 1);
         const d = j * rowWidth + (i + 1);
-
         indices.push(a, b, d);
         indices.push(b, c, d);
       }
+
+      // Foam ribbon indices
+      const fa = j * 2;
+      const fb = (j + 1) * 2;
+      foamIndices.push(fa, fb, fa + 1);
+      foamIndices.push(fb, fb + 1, fa + 1);
     }
 
     geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -67,10 +89,21 @@ export function ReflectiveStream() {
     geom.setIndex(indices);
     geom.computeVertexNormals();
 
-    // Setup offscreen canvas for animated ripple normal map
+    // Build left foam ribbon
+    const lFoam = new THREE.BufferGeometry();
+    lFoam.setAttribute('position', new THREE.Float32BufferAttribute(leftFoamPos, 3));
+    lFoam.setAttribute('uv', new THREE.Float32BufferAttribute(foamUvs, 2));
+    lFoam.setIndex(foamIndices);
+
+    // Build right foam ribbon
+    const rFoam = new THREE.BufferGeometry();
+    rFoam.setAttribute('position', new THREE.Float32BufferAttribute(rightFoamPos, 3));
+    rFoam.setAttribute('uv', new THREE.Float32BufferAttribute(foamUvs, 2));
+    rFoam.setIndex(foamIndices);
+
+    // Offscreen canvas for scrolling ripple normals
     let canvas: HTMLCanvasElement | null = null;
     let ctx: CanvasRenderingContext2D | null = null;
-
     if (typeof document !== 'undefined') {
       canvas = document.createElement('canvas');
       canvas.width = 128;
@@ -78,89 +111,179 @@ export function ReflectiveStream() {
       ctx = canvas.getContext('2d');
     }
 
-    return { geometry: geom, normalCanvas: canvas, normalCtx: ctx };
+    return {
+      streamGeometry: geom,
+      leftFoamGeom: lFoam,
+      rightFoamGeom: rFoam,
+      bedGeometry: geom.clone(),
+      normalCanvas: canvas,
+      normalCtx: ctx,
+    };
   }, []);
 
-  // Initialize CanvasTexture for water ripple normals
+  // Scrolling Ripple Texture
   const rippleTexture = useMemo(() => {
     if (!normalCanvas) return null;
     const tex = new THREE.CanvasTexture(normalCanvas);
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(4, 16);
+    tex.repeat.set(4, 18);
     normalMapRef.current = tex;
     return tex;
   }, [normalCanvas]);
 
-  // Animate water normal map ripples in useFrame
+  // Soft Alpha-Blended Foam Shader Material
+  const foamMaterial = useMemo(() => {
+    return new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.NormalBlending,
+      side: THREE.DoubleSide,
+      uniforms: {
+        uTime: { value: 0 },
+        uFoamColor: { value: new THREE.Color('#e8dcc4') },
+        uWaterColor: { value: new THREE.Color('#0a1f1a') },
+      },
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform float uTime;
+        uniform vec3 uFoamColor;
+        uniform vec3 uWaterColor;
+        varying vec2 vUv;
+
+        ${glslNoise3D}
+
+        void main() {
+          // Foam edge wave
+          float edge = vUv.x; // 0.0 outer bank, 1.0 inner stream
+          float wave = snoise(vec3(vUv * 8.0, uTime * 0.8));
+          float foamMask = smoothstep(0.1, 0.9, edge + wave * 0.35);
+
+          // Soft alpha blend
+          float alpha = (1.0 - edge) * smoothstep(0.0, 0.4, edge) * (0.45 + wave * 0.25);
+          gl_FragColor = vec4(mix(uWaterColor, uFoamColor, foamMask), alpha * 0.65);
+        }
+      `,
+    });
+  }, []);
+
+  // Underwater Caustics Shader Material
+  const causticsMaterial = useMemo(() => {
+    return new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      uniforms: {
+        uTime: { value: 0 },
+        uCausticGold: { value: new THREE.Color('#c9a961') },
+      },
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        varying vec3 vWorldPos;
+        void main() {
+          vUv = uv;
+          vec4 worldPos = modelMatrix * vec4(position, 1.0);
+          vWorldPos = worldPos.xyz;
+          gl_Position = projectionMatrix * viewMatrix * worldPos;
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform float uTime;
+        uniform vec3 uCausticGold;
+        varying vec2 vUv;
+        varying vec3 vWorldPos;
+
+        void main() {
+          // Voronoi-like wave caustic interference pattern
+          vec2 p = vWorldPos.xz * 1.8;
+          float c1 = sin(p.x * 2.5 + uTime * 2.2) * cos(p.y * 2.2 + uTime * 1.8);
+          float c2 = sin(p.x * 4.2 - uTime * 1.5 + p.y * 3.0);
+          float c3 = cos((p.x + p.y) * 3.5 + uTime * 2.0);
+          float caustic = pow(clamp(c1 + c2 + c3, 0.0, 3.0) / 3.0, 3.2);
+
+          gl_FragColor = vec4(uCausticGold * caustic * 0.35, caustic * 0.3);
+        }
+      `,
+    });
+  }, []);
+
+  // Animate scrolling normal map and shaders in useFrame
   useFrame(({ clock }) => {
-    if (!normalCtx || !normalCanvas || !normalMapRef.current) return;
-    const time = clock.getElapsedTime() * 1.5;
+    const time = clock.getElapsedTime();
 
-    // Render multi-octave water wave normal map
-    const width = 128;
-    const height = 128;
-    const imgData = normalCtx.createImageData(width, height);
-    const data = imgData.data;
-
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const index = (y * width + x) * 4;
-
-        // Wave interference pattern
-        const nx = x / width;
-        const ny = y / height;
-        const w1 = Math.sin(nx * 18 + time) * Math.cos(ny * 14 + time * 0.8);
-        const w2 = Math.sin(nx * 32 - time * 1.2 + ny * 20) * 0.5;
-        const w3 = Math.cos((nx + ny) * 24 + time * 1.5) * 0.3;
-        const h = w1 + w2 + w3;
-
-        // Perturb normals (Tangent space: R=X, G=Y, B=Z)
-        const dx = Math.cos(nx * 18 + time) * 25 + Math.cos(nx * 32) * 15;
-        const dy = Math.sin(ny * 14 + time) * 25 + Math.sin(ny * 20) * 15;
-
-        data[index] = Math.min(255, Math.max(0, 128 + dx)); // Red (X normal)
-        data[index + 1] = Math.min(255, Math.max(0, 128 + dy)); // Green (Y normal)
-        data[index + 2] = 240; // Blue (Z pointing up)
-        data[index + 3] = 255; // Alpha
-      }
+    if (foamMaterialRef.current) {
+      foamMaterialRef.current.uniforms.uTime.value = time;
+    }
+    if (causticsMaterialRef.current) {
+      causticsMaterialRef.current.uniforms.uTime.value = time;
     }
 
+    if (!normalCtx || !normalCanvas || !normalMapRef.current) return;
+    const w = 128;
+    const h = 128;
+    const imgData = normalCtx.createImageData(w, h);
+    const data = imgData.data;
+
+    // Normal map scroll
+    const scrollT = time * 1.4;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = (y * w + x) * 4;
+        const nx = x / w;
+        const ny = y / h;
+
+        const dx = Math.cos(nx * 20.0 + scrollT) * 26 + Math.cos(nx * 36.0 - scrollT * 1.2) * 16;
+        const dy = Math.sin(ny * 16.0 + scrollT * 1.5) * 26 + Math.sin(ny * 28.0) * 16;
+
+        data[idx] = Math.min(255, Math.max(0, 128 + dx));
+        data[idx + 1] = Math.min(255, Math.max(0, 128 + dy));
+        data[idx + 2] = 245;
+        data[idx + 3] = 255;
+      }
+    }
     normalCtx.putImageData(imgData, 0, 0);
     normalMapRef.current.needsUpdate = true;
   });
 
   return (
     <group position={[0, 0, 0]}>
-      {/* Real-time Reflective Water Surface */}
-      <mesh ref={meshRef} geometry={geometry} receiveShadow>
+      {/* Underwater Caustics projected onto stream bed */}
+      <mesh geometry={bedGeometry} position={[0, -0.15, 0]}>
+        <primitive object={causticsMaterial} ref={causticsMaterialRef} attach="material" />
+      </mesh>
+
+      {/* Main Stream Surface: MeshReflectorMaterial with exact mandated props */}
+      <mesh ref={meshRef} geometry={streamGeometry} receiveShadow>
         <MeshReflectorMaterial
-          blur={[300, 100]}
-          resolution={512}
-          mirror={0.72}
-          mixBlur={0.8}
-          mixStrength={2.2}
-          roughness={0.18}
-          depthScale={1.4}
-          minDepthThreshold={0.4}
-          maxDepthThreshold={1.6}
-          color="#06221c"
-          metalness={0.65}
+          blur={[300, 80]}
+          resolution={1024}
+          mirror={0.88}
+          mixBlur={0.25}
+          mixStrength={3.2}
+          roughness={0.05}
+          depthScale={1.3}
+          minDepthThreshold={0.3}
+          maxDepthThreshold={1.5}
+          color="#0a1f1a"
+          metalness={0.7}
           reflectorOffset={0.02}
           normalMap={rippleTexture || undefined}
           normalScale={new THREE.Vector2(0.35, 0.35)}
         />
       </mesh>
 
-      {/* Subtle glowing riverbed undercurrent */}
-      <mesh geometry={geometry} position={[0, -0.05, 0]}>
-        <meshBasicMaterial
-          color="#0a3f35"
-          transparent
-          opacity={0.35}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
+      {/* Soft Alpha-Blended Foam Ribbons along Shorelines */}
+      <mesh geometry={leftFoamGeom}>
+        <primitive object={foamMaterial} ref={foamMaterialRef} attach="material" />
+      </mesh>
+      <mesh geometry={rightFoamGeom}>
+        <primitive object={foamMaterial} attach="material" />
       </mesh>
     </group>
   );

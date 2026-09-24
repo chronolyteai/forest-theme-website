@@ -1,6 +1,7 @@
+@import "@fontsource/cormorant-garamond/300.css";
 @import "@fontsource/cormorant-garamond/400.css";
 @import "@fontsource/cormorant-garamond/600.css";
-@import "@fontsource/cormorant-garamond/700.css";
+@import "@fontsource/cormorant-garamond/300-italic.css";
 @import "@fontsource/cormorant-garamond/400-italic.css";
 @import "@fontsource/inter/300.css";
 @import "@fontsource/inter/400.css";
@@ -12,10 +13,15 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 245, 245, 240;
-  --background-rgb: 3, 13, 8;
-  --accent-gold: 245, 158, 11;
-  --accent-emerald: 62, 184, 138;
+  --color-deep-shadow: #0a1f1a;
+  --color-mid-forest: #1a3d2e;
+  --color-moss-accent: #2d5a4a;
+  --color-sun-gold: #c9a961;
+  --color-warm-amber: #ffb347;
+  --color-firefly-lime: #d4ff7a;
+  --color-spirit-cyan: #7fffcf;
+  --color-fog-warm: #e8dcc4;
+  --color-sky-top: #4a7a6a;
 }
 
 * {
@@ -25,8 +31,8 @@
 }
 
 html, body {
-  background-color: #030d08;
-  color: #f3f4f6;
+  background-color: #0a1f1a;
+  color: #e8dcc4;
   font-family: "Inter", system-ui, -apple-system, sans-serif;
   overflow-x: hidden;
   user-select: none;
@@ -34,7 +40,7 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Hide default cursor on desktop when custom cursor is active */
+/* Custom Cursor Active on Desktop */
 @media (hover: hover) and (pointer: fine) {
   body.custom-cursor-active,
   body.custom-cursor-active * {
@@ -44,44 +50,20 @@ html, body {
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 5px;
+  width: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(3, 13, 8, 0.8);
+  background: #0a1f1a;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(62, 184, 138, 0.25);
+  background: rgba(201, 169, 97, 0.35);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(253, 211, 77, 0.5);
+  background: rgba(255, 179, 71, 0.7);
 }
 
-/* Cinematic film grain overlay */
-.cinematic-grain {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  pointer-events: none;
-  z-index: 40;
-  opacity: 0.035;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-}
-
-/* Vignette shadow overlay */
-.cinematic-vignette {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 39;
-  background: radial-gradient(circle at center, transparent 40%, rgba(3, 13, 8, 0.75) 100%);
-  transition: opacity 0.5s ease;
-}
-
-/* Selection */
 ::selection {
-  background: rgba(245, 158, 11, 0.4);
-  color: #fff;
+  background: #c9a961;
+  color: #0a1f1a;
 }

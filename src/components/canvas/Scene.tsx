@@ -3,14 +3,14 @@
 import React, { Suspense, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import * as THREE from 'three';
+import { AtmosphericSun } from './AtmosphericSun';
+import { GodRays } from './GodRays';
+import { VolumetricFog } from './VolumetricFog';
 import { ForestTerrain } from './ForestTerrain';
 import { ReflectiveStream } from './ReflectiveStream';
 import { InstancedTrees } from './InstancedTrees';
-import { VolumetricLightRays } from './VolumetricLightRays';
-import { GroundMist } from './GroundMist';
 import { Fireflies } from './Fireflies';
-import { FallingLeaves } from './FallingLeaves';
-import { SpiritCreature } from './SpiritCreature';
+import { SpiritDeer } from './SpiritDeer';
 import { CameraFlight } from './CameraFlight';
 import { PostEffects } from './PostEffects';
 import { useForestStore } from '@/store/useForestStore';
@@ -19,7 +19,7 @@ import { forestAudio } from '@/utils/audioSynthesizer';
 function ForestEnvironment() {
   const triggerBurst = useForestStore((s) => s.triggerBurst);
 
-  // Scene pointer click handler for burst sparks
+  // Click scene to burst fireflies
   const handlePointerDown = (e: { stopPropagation: () => void; point: THREE.Vector3 }) => {
     e.stopPropagation();
     triggerBurst(e.point.x, Math.max(1.0, e.point.y), e.point.z);
@@ -28,55 +28,54 @@ function ForestEnvironment() {
 
   return (
     <group onPointerDown={handlePointerDown}>
-      {/* Mystical Forest Fog */}
-      <fog attach="fog" args={['#051912', 6, 52]} />
+      {/* Exponential depth fog blending exact palette #0a1f1a */}
+      <fog attach="fog" args={['#0a1f1a', 8, 62]} />
 
-      {/* Atmospheric Lighting */}
-      {/* 1. Golden Hour Sun (piercing through canopy from upper right) */}
+      {/* Atmospheric Directional Sun (#c9a961 to #ffb347) */}
       <directionalLight
-        position={[18, 30, -18]}
-        intensity={2.8}
-        color="#ffc368"
+        position={[14, 22, -42]}
+        intensity={3.2}
+        color="#c9a961"
         castShadow
         shadow-mapSize={[1024, 1024]}
-        shadow-camera-left={-25}
-        shadow-camera-right={25}
-        shadow-camera-top={25}
-        shadow-camera-bottom={-25}
+        shadow-camera-left={-26}
+        shadow-camera-right={26}
+        shadow-camera-top={26}
+        shadow-camera-bottom={-26}
         shadow-camera-near={0.5}
-        shadow-camera-far={70}
+        shadow-camera-far={75}
       />
 
-      {/* 2. Deep Teal Ambient Fill (cool shadows contrasting warm sunbeams) */}
-      <ambientLight intensity={0.55} color="#0d3238" />
+      {/* Deep Shadow Ambient Fill (#0a1f1a) */}
+      <ambientLight intensity={0.45} color="#0a1f1a" />
 
-      {/* 3. Forest Hemispherical Light (Canopy emerald to damp soil) */}
+      {/* Canopy Hemispherical Light: Sky #4a7a6a to Ground #0a1f1a */}
       <hemisphereLight
-        args={['#164a38', '#04110b', 0.65]}
+        args={['#4a7a6a', '#0a1f1a', 0.65]}
         position={[0, 20, 0]}
       />
 
-      {/* 4. Warm Sun Rim Accent */}
+      {/* Warm Amber Sun Rim Accent (#ffb347) */}
       <directionalLight
-        position={[-12, 12, 10]}
+        position={[-12, 14, 8]}
         intensity={0.45}
-        color="#fcd34d"
+        color="#ffb347"
       />
 
-      {/* Core 3D Components */}
+      {/* Core 3D Elements */}
+      <AtmosphericSun />
+      <GodRays />
+      <VolumetricFog />
       <ReflectiveStream />
       <ForestTerrain />
       <InstancedTrees />
-      <VolumetricLightRays />
-      <GroundMist />
-      <SpiritCreature />
-      <FallingLeaves />
+      <SpiritDeer />
       <Fireflies />
 
-      {/* Cinematic Camera Controller */}
+      {/* Camera Controller with FOV 35, CatmullRom path & tree collision */}
       <CameraFlight />
 
-      {/* Post Processing Effects */}
+      {/* 7-Layer Post-Processing Stack */}
       <PostEffects />
     </group>
   );
@@ -85,12 +84,23 @@ function ForestEnvironment() {
 export function ForestCanvas() {
   const setLoadingProgress = useForestStore((s) => s.setLoadingProgress);
   const setIsLoaded = useForestStore((s) => s.setIsLoaded);
+  const setIsMobile = useForestStore((s) => s.setIsMobile);
 
-  // Progressive loader simulation for initial asset generation
+  // Performance rule: Detect hardwareConcurrency and screen width
   useEffect(() => {
-    let progress = 10;
+    if (typeof window !== 'undefined') {
+      const isLowEnd =
+        (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ||
+        window.innerWidth < 768;
+      setIsMobile(Boolean(isLowEnd));
+    }
+  }, [setIsMobile]);
+
+  // Asset initialization loader
+  useEffect(() => {
+    let progress = 12;
     const interval = setInterval(() => {
-      progress += Math.floor(Math.random() * 18) + 8;
+      progress += Math.floor(Math.random() * 16) + 7;
       if (progress >= 100) {
         progress = 100;
         clearInterval(interval);
@@ -99,13 +109,13 @@ export function ForestCanvas() {
       } else {
         setLoadingProgress(progress);
       }
-    }, 120);
+    }, 110);
 
     return () => clearInterval(interval);
   }, [setLoadingProgress, setIsLoaded]);
 
   return (
-    <div className="fixed inset-0 w-full h-full pointer-events-auto bg-[#030d08]">
+    <div className="fixed inset-0 w-full h-full pointer-events-auto bg-[#0a1f1a]">
       <Canvas
         shadows
         dpr={[1, typeof window !== 'undefined' && window.devicePixelRatio > 1.5 ? 1.5 : 1]}
@@ -117,10 +127,10 @@ export function ForestCanvas() {
           depth: true,
         }}
         camera={{
-          position: [0, 3.4, 18],
-          fov: 46,
+          position: [0, 3.2, 18],
+          fov: 35, // MANDATED: Base FOV 35 (cinematic, NOT 75)
           near: 0.1,
-          far: 80,
+          far: 90,
         }}
       >
         <Suspense fallback={null}>

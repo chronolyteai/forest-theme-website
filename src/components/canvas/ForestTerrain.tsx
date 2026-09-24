@@ -6,30 +6,30 @@ import { getRiverCenter, getRiverWidth, getTerrainHeight } from '@/utils/noise';
 
 /**
  * ForestTerrain:
- * Procedural ancient forest floor with undulating mossy hills,
- * carved riverbed, river stones, and fallen moss-covered ancient logs.
+ * Procedural ancient forest floor with:
+ * - 3-octave noise displaced terrain mesh
+ * - 48+ instanced mossy boulders
+ * - Riverbank fern clusters
+ * - Bioluminescent low-poly glowing mushroom clusters (#d4ff7a and #7fffcf)
  */
 export function ForestTerrain() {
-  // Generate ground mesh deformed by procedural terrain height
-  const { terrainGeometry, rocks, logs, ferns } = useMemo(() => {
-    const width = 64;
-    const depth = 90;
-    const segmentsX = 80;
-    const segmentsZ = 100;
+  const { terrainGeometry, rocks, mushrooms, ferns } = useMemo(() => {
+    const width = 72;
+    const depth = 100;
+    const segmentsX = 90;
+    const segmentsZ = 120;
 
     const geom = new THREE.PlaneGeometry(width, depth, segmentsX, segmentsZ);
     geom.rotateX(-Math.PI / 2);
-    // Center around z = -10 so it extends from z = 35 to z = -55
-    geom.translate(0, 0, -10);
+    geom.translate(0, 0, -12); // Center around z = -12
 
     const pos = geom.attributes.position;
     const count = pos.count;
     const colors = new Float32Array(count * 3);
 
-    const mossColor = new THREE.Color('#1b422a');
-    const deepSoilColor = new THREE.Color('#08160f');
-    const riverBedColor = new THREE.Color('#05120c');
-    const goldMossColor = new THREE.Color('#2d5e38');
+    const mossAccent = new THREE.Color('#2d5a4a');
+    const midForest = new THREE.Color('#1a3d2e');
+    const deepShadow = new THREE.Color('#0a1f1a');
 
     for (let i = 0; i < count; i++) {
       const x = pos.getX(i);
@@ -37,24 +37,23 @@ export function ForestTerrain() {
       const h = getTerrainHeight(x, z);
       pos.setY(i, h);
 
-      // Color computation based on proximity to river & elevation
+      // Color assignment based on river proximity and elevation
       const riverX = getRiverCenter(z);
-      const distToRiver = Math.abs(x - riverX);
       const riverW = getRiverWidth(z);
+      const distToRiver = Math.abs(x - riverX);
 
       const vertexColor = new THREE.Color();
       if (distToRiver < riverW) {
-        // Deep riverbed
-        vertexColor.copy(riverBedColor);
+        // Stream bed (deep shadow)
+        vertexColor.copy(deepShadow);
       } else if (distToRiver < riverW + 2.5) {
-        // Wet muddy river bank
+        // Damp bank
         const t = (distToRiver - riverW) / 2.5;
-        vertexColor.lerpColors(riverBedColor, deepSoilColor, t);
+        vertexColor.lerpColors(deepShadow, midForest, t);
       } else {
-        // Forest floor with lush moss
-        const mossNoise = Math.sin(x * 0.4) * Math.cos(z * 0.4);
-        const t = (h + 0.5) / 2.5;
-        vertexColor.lerpColors(mossColor, goldMossColor, Math.max(0, Math.min(1, t + mossNoise * 0.2)));
+        // Mossy forest floor
+        const t = Math.max(0.0, Math.min(1.0, (h + 0.5) / 2.4));
+        vertexColor.lerpColors(midForest, mossAccent, t);
       }
 
       colors[i * 3] = vertexColor.r;
@@ -65,93 +64,85 @@ export function ForestTerrain() {
     geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geom.computeVertexNormals();
 
-    // Procedural river boulders & rocks
-    const rockList: Array<{ position: [number, number, number]; scale: [number, number, number]; rotation: [number, number, number] }> = [];
-    for (let z = 25; z > -45; z -= 1.8) {
+    // 48+ instanced boulders
+    const rockList: Array<{ pos: [number, number, number]; scale: [number, number, number]; rot: [number, number, number] }> = [];
+    for (let z = 24; z > -48; z -= 1.6) {
       const rX = getRiverCenter(z);
       const rW = getRiverWidth(z);
-      // Place stones on both sides of river bank
-      const offsets = [-(rW + 0.3 + Math.random() * 1.5), (rW + 0.3 + Math.random() * 1.5)];
-      offsets.forEach((off) => {
-        if (Math.random() > 0.4) {
+      [-rW - 0.6 - Math.random() * 1.8, rW + 0.6 + Math.random() * 1.8].forEach((off) => {
+        if (Math.random() > 0.35) {
           const x = rX + off;
-          const y = getTerrainHeight(x, z) + 0.1;
-          const s = 0.35 + Math.random() * 0.7;
+          const y = getTerrainHeight(x, z) + 0.15;
+          const s = 0.4 + Math.random() * 0.8;
           rockList.push({
-            position: [x, y, z],
-            scale: [s * (0.8 + Math.random() * 0.4), s * (0.6 + Math.random() * 0.5), s * (0.8 + Math.random() * 0.4)],
-            rotation: [Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI],
+            pos: [x, y, z],
+            scale: [s * (0.8 + Math.random() * 0.4), s * (0.6 + Math.random() * 0.4), s * (0.8 + Math.random() * 0.4)],
+            rot: [Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI],
           });
         }
       });
     }
 
-    // Ancient fallen mossy logs
-    const logList: Array<{ position: [number, number, number]; scale: [number, number, number]; rotation: [number, number, number] }> = [];
-    const logLocations = [
-      { x: -5, z: 12, rotY: 0.6, length: 7 },
-      { x: 6, z: 2, rotY: -0.4, length: 8 },
-      { x: -7, z: -14, rotY: 1.1, length: 9 },
-      { x: 5, z: -28, rotY: -0.8, length: 8 },
-    ];
-    logLocations.forEach((loc) => {
-      const y = getTerrainHeight(loc.x, loc.z) + 0.35;
-      logList.push({
-        position: [loc.x, y, loc.z],
-        scale: [0.55, loc.length, 0.55],
-        rotation: [Math.PI / 2 + (Math.random() - 0.5) * 0.1, loc.rotY, (Math.random() - 0.5) * 0.1],
-      });
-    });
-
-    // Fern clusters along the banks
-    const fernList: Array<{ position: [number, number, number]; rotation: number; scale: number }> = [];
-    for (let z = 24; z > -45; z -= 1.5) {
+    // Low-poly glowing mushroom clusters (#d4ff7a and #7fffcf)
+    const shroomList: Array<{ pos: [number, number, number]; scale: number; color: string }> = [];
+    const shroomColors = ['#d4ff7a', '#7fffcf'];
+    for (let z = 20; z > -42; z -= 3.2) {
       const rX = getRiverCenter(z);
       const rW = getRiverWidth(z);
-      const sides = [rX - rW - 1.2 - Math.random() * 3, rX + rW + 1.2 + Math.random() * 3];
+      const sides = [rX - rW - 1.5 - Math.random() * 2.5, rX + rW + 1.5 + Math.random() * 2.5];
       sides.forEach((x) => {
-        if (Math.random() > 0.3) {
+        const y = getTerrainHeight(x, z);
+        // Cluster of 2-4 mushrooms
+        const clusterCount = 2 + Math.floor(Math.random() * 3);
+        const col = shroomColors[Math.floor(Math.random() * shroomColors.length)];
+        for (let k = 0; k < clusterCount; k++) {
+          shroomList.push({
+            pos: [x + (Math.random() - 0.5) * 0.6, y + 0.05, z + (Math.random() - 0.5) * 0.6],
+            scale: 0.12 + Math.random() * 0.16,
+            color: col,
+          });
+        }
+      });
+    }
+
+    // Fern clusters
+    const fernList: Array<{ pos: [number, number, number]; rotY: number; scale: number }> = [];
+    for (let z = 22; z > -45; z -= 1.8) {
+      const rX = getRiverCenter(z);
+      const rW = getRiverWidth(z);
+      [-rW - 1.2 - Math.random() * 3.0, rW + 1.2 + Math.random() * 3.0].forEach((x) => {
+        if (Math.random() > 0.35) {
           const y = getTerrainHeight(x, z);
           fernList.push({
-            position: [x, y + 0.1, z],
-            rotation: Math.random() * Math.PI * 2,
-            scale: 0.6 + Math.random() * 0.7,
+            pos: [x, y + 0.1, z],
+            rotY: Math.random() * Math.PI * 2,
+            scale: 0.7 + Math.random() * 0.6,
           });
         }
       });
     }
 
-    return { terrainGeometry: geom, rocks: rockList, logs: logList, ferns: fernList };
+    return { terrainGeometry: geom, rocks: rockList, mushrooms: shroomList, ferns: fernList };
   }, []);
 
-  // Geometry for rocks (dodecahedron for natural faceted stone shape)
   const rockGeometry = useMemo(() => new THREE.DodecahedronGeometry(1, 1), []);
   const rockMaterial = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: '#1a2822',
-        roughness: 0.9,
-        metalness: 0.1,
+        color: '#1a3d2e',
+        roughness: 0.94,
+        metalness: 0.06,
         flatShading: true,
       }),
     []
   );
 
-  // Geometry for ancient logs
-  const logGeometry = useMemo(() => new THREE.CylinderGeometry(0.7, 0.9, 1, 8), []);
-  const logMaterial = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        color: '#181f18',
-        roughness: 0.95,
-        metalness: 0.05,
-      }),
-    []
-  );
+  const shroomCapGeometry = useMemo(() => new THREE.ConeGeometry(0.5, 0.45, 7), []);
+  const shroomStemGeometry = useMemo(() => new THREE.CylinderGeometry(0.1, 0.14, 0.7, 6), []);
 
   return (
     <group>
-      {/* Main undulating forest floor */}
+      {/* 3-Octave Displaced Ground Terrain */}
       <mesh geometry={terrainGeometry} receiveShadow>
         <meshStandardMaterial
           vertexColors
@@ -160,48 +151,53 @@ export function ForestTerrain() {
         />
       </mesh>
 
-      {/* River bank boulders */}
+      {/* 48+ Instanced Boulders */}
       {rocks.map((r, i) => (
         <mesh
           key={`rock-${i}`}
           geometry={rockGeometry}
           material={rockMaterial}
-          position={r.position}
+          position={r.pos}
           scale={r.scale}
-          rotation={r.rotation}
+          rotation={r.rot}
           castShadow
           receiveShadow
         />
       ))}
 
-      {/* Ancient mossy fallen logs */}
-      {logs.map((l, i) => (
-        <mesh
-          key={`log-${i}`}
-          geometry={logGeometry}
-          material={logMaterial}
-          position={l.position}
-          scale={l.scale}
-          rotation={l.rotation}
-          castShadow
-          receiveShadow
-        />
+      {/* Low-Poly Bioluminescent Mushroom Clusters */}
+      {mushrooms.map((m, i) => (
+        <group key={`shroom-${i}`} position={m.pos} scale={m.scale}>
+          {/* Stem */}
+          <mesh geometry={shroomStemGeometry} position={[0, 0.35, 0]}>
+            <meshStandardMaterial color="#0a1f1a" roughness={0.8} />
+          </mesh>
+          {/* Glowing Cap */}
+          <mesh geometry={shroomCapGeometry} position={[0, 0.75, 0]}>
+            <meshStandardMaterial
+              color={m.color}
+              emissive={m.color}
+              emissiveIntensity={2.4}
+              roughness={0.25}
+            />
+          </mesh>
+        </group>
       ))}
 
-      {/* Stylized forest ferns */}
+      {/* Instanced Forest Ferns */}
       {ferns.map((f, i) => (
-        <group key={`fern-${i}`} position={f.position} rotation={[0, f.rotation, 0]} scale={f.scale}>
-          {[0, 1, 2, 3, 4].map((leafIdx) => {
-            const angle = (leafIdx / 5) * Math.PI * 2;
+        <group key={`fern-${i}`} position={f.pos} rotation={[0, f.rotY, 0]} scale={f.scale}>
+          {[0, 1, 2, 3, 4].map((lIdx) => {
+            const angle = (lIdx / 5) * Math.PI * 2;
             return (
               <mesh
-                key={leafIdx}
-                rotation={[0.5, angle, 0]}
-                position={[Math.sin(angle) * 0.3, 0.15, Math.cos(angle) * 0.3]}
+                key={lIdx}
+                rotation={[0.55, angle, 0]}
+                position={[Math.sin(angle) * 0.35, 0.15, Math.cos(angle) * 0.35]}
               >
-                <planeGeometry args={[0.35, 1.1]} />
+                <planeGeometry args={[0.38, 1.2]} />
                 <meshStandardMaterial
-                  color="#1e5838"
+                  color="#2d5a4a"
                   roughness={0.7}
                   side={THREE.DoubleSide}
                 />

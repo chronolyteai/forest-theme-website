@@ -1,287 +1,348 @@
 'use client';
 
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
-import { useForestStore } from '@/store/useForestStore';
 import { getRiverCenter, getRiverWidth, getTerrainHeight } from '@/utils/noise';
+
+export interface TreeInstanceData {
+  x: number;
+  y: number;
+  z: number;
+  scaleY: number;
+  scaleXZ: number;
+  rotY: number;
+  rotTilt: number;
+  instanceOffset: number;
+}
+
+// Exported for camera collision detection (collision radius 1.5)
+export const activeTreePositions: Array<{ x: number; z: number; radius: number }> = [];
 
 /**
  * InstancedTrees:
- * High-performance instanced forest with 140+ ancient redwood & oak trees.
- * - Instanced trunks with root flaring and height variation
- * - Multi-tiered foliage clusters with custom inline GLSL wind sway shader
- * - High-frequency leaf flutter and golden-hour rim lighting
- * - Hover interaction: pointer over trees triggers glowing leaf shimmer
+ * 320+ ancient redwood and cedar trees distributed across the valley.
+ * - Trunks: procedural dark bark normal map, moss patches via vertex color blend
+ * - Foliage: custom vertex shader with exact wind sway formula:
+ *     pos.x += sin(time * 0.5 + pos.y * 0.3 + instanceOffset) * 0.05 * height
+ * - Backlit rim lighting (Fresnel term, warm amber #ffb347)
+ * - Distant trees fade into pure silhouettes #0a1f1a
+ * - Dense overhead canopy layer occluding the sky
  */
 export function InstancedTrees() {
   const trunkMeshRef = useRef<THREE.InstancedMesh>(null);
   const foliageMeshRef = useRef<THREE.InstancedMesh>(null);
+  const overheadCanopyRef = useRef<THREE.InstancedMesh>(null);
   const foliageMaterialRef = useRef<THREE.ShaderMaterial>(null);
 
-  const setHoveredTree = useForestStore((s) => s.setHoveredTree);
-  const hoveredTree = useForestStore((s) => s.hoveredTree);
-
-  // Generate tree transforms across the landscape
+  // Generate 320 tree positions
   const treeData = useMemo(() => {
-    const trees: Array<{
-      x: number;
-      y: number;
-      z: number;
-      scaleY: number;
-      scaleXZ: number;
-      rotY: number;
-      rotTilt: number;
-    }> = [];
+    const list: TreeInstanceData[] = [];
+    activeTreePositions.length = 0;
 
-    // Grid distribution with organic jitter along the 90m deep forest
-    const minZ = -52;
+    const minZ = -55;
     const maxZ = 28;
-    const stepZ = 3.6;
+    const countZ = 40;
+    const stepZ = (maxZ - minZ) / countZ;
 
-    for (let z = maxZ; z >= minZ; z -= stepZ) {
-      const riverX = getRiverCenter(z);
-      const riverW = getRiverWidth(z) + 1.8; // Safe clearance from water
+    for (let i = 0; i < countZ; i++) {
+      const z = maxZ - i * stepZ;
+      const rX = getRiverCenter(z);
+      const rW = getRiverWidth(z) + 1.6;
 
-      // Left bank trees (3 to 4 depth rows)
+      // Left bank (4 rows of depth)
       for (let col = 0; col < 4; col++) {
-        const x = riverX - riverW - 1.5 - col * 3.8 - Math.random() * 2.2;
+        const x = rX - rW - 1.2 - col * 3.6 - Math.random() * 2.2;
         const y = getTerrainHeight(x, z);
-        const scaleY = 14 + Math.random() * 14;
-        const scaleXZ = 0.8 + Math.random() * 0.6;
-        trees.push({
-          x,
-          y,
-          z: z + (Math.random() - 0.5) * 2.5,
-          scaleY,
-          scaleXZ,
-          rotY: Math.random() * Math.PI * 2,
-          rotTilt: (Math.random() - 0.5) * 0.08,
-        });
+        const scaleY = 16 + Math.random() * 16;
+        const scaleXZ = 0.85 + Math.random() * 0.55;
+        const rotY = Math.random() * Math.PI * 2;
+        const rotTilt = (Math.random() - 0.5) * 0.06;
+        const offset = Math.random() * 20.0;
+
+        list.push({ x, y, z: z + (Math.random() - 0.5) * 2.0, scaleY, scaleXZ, rotY, rotTilt, instanceOffset: offset });
+        activeTreePositions.push({ x, z, radius: 1.5 });
       }
 
-      // Right bank trees (3 to 4 depth rows)
+      // Right bank (4 rows of depth)
       for (let col = 0; col < 4; col++) {
-        const x = riverX + riverW + 1.5 + col * 3.8 + Math.random() * 2.2;
+        const x = rX + rW + 1.2 + col * 3.6 + Math.random() * 2.2;
         const y = getTerrainHeight(x, z);
-        const scaleY = 14 + Math.random() * 14;
-        const scaleXZ = 0.8 + Math.random() * 0.6;
-        trees.push({
-          x,
-          y,
-          z: z + (Math.random() - 0.5) * 2.5,
-          scaleY,
-          scaleXZ,
-          rotY: Math.random() * Math.PI * 2,
-          rotTilt: (Math.random() - 0.5) * 0.08,
-        });
-      }
+        const scaleY = 16 + Math.random() * 16;
+        const scaleXZ = 0.85 + Math.random() * 0.55;
+        const rotY = Math.random() * Math.PI * 2;
+        const rotTilt = (Math.random() - 0.5) * 0.06;
+        const offset = Math.random() * 20.0;
 
-      // Dense background trees at the far horizon
-      if (z < -38) {
-        for (let bg = 0; bg < 3; bg++) {
-          const x = riverX + (Math.random() - 0.5) * 16;
-          const y = getTerrainHeight(x, z);
-          trees.push({
-            x,
-            y,
-            z: z - Math.random() * 8,
-            scaleY: 18 + Math.random() * 12,
-            scaleXZ: 1.1,
-            rotY: Math.random() * Math.PI * 2,
-            rotTilt: 0,
-          });
-        }
+        list.push({ x, y, z: z + (Math.random() - 0.5) * 2.0, scaleY, scaleXZ, rotY, rotTilt, instanceOffset: offset });
+        activeTreePositions.push({ x, z, radius: 1.5 });
       }
     }
 
-    return trees;
+    // Distant background ridge trees (silhouettes in fog)
+    for (let bg = 0; bg < 40; bg++) {
+      const z = -40 - Math.random() * 22;
+      const x = (Math.random() - 0.5) * 55;
+      const y = getTerrainHeight(x, z) + 1.5;
+      const scaleY = 22 + Math.random() * 12;
+      const scaleXZ = 1.1 + Math.random() * 0.5;
+      const offset = Math.random() * 20.0;
+
+      list.push({ x, y, z, scaleY, scaleXZ, rotY: Math.random() * Math.PI * 2, rotTilt: 0, instanceOffset: offset });
+      activeTreePositions.push({ x, z, radius: 1.5 });
+    }
+
+    return list;
   }, []);
 
-  const treeCount = treeData.length;
+  const treeCount = treeData.length; // 360 trees
 
-  // Geometry for ancient trunks (tapering cylinder)
+  // Procedural Bark Normal Map generated on 256x256 Canvas
+  const barkNormalMap = useMemo(() => {
+    if (typeof document === 'undefined') return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    const img = ctx.createImageData(256, 256);
+    const d = img.data;
+    for (let y = 0; y < 256; y++) {
+      for (let x = 0; x < 256; x++) {
+        const idx = (y * 256 + x) * 4;
+        // Vertical bark grooves
+        const nx = x / 256;
+        const ny = y / 256;
+        const groove = Math.sin(nx * 60.0 + Math.sin(ny * 20.0) * 2.0);
+        const fine = Math.sin(nx * 140.0) * 0.4;
+        const val = groove + fine;
+
+        const dx = Math.cos(nx * 60.0) * 45;
+        const dy = Math.sin(ny * 20.0) * 15;
+
+        d[idx] = Math.min(255, Math.max(0, 128 + dx));     // Normal X
+        d[idx + 1] = Math.min(255, Math.max(0, 128 + dy)); // Normal Y
+        d[idx + 2] = 240;                                  // Normal Z (pointing out)
+        d[idx + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(2, 8);
+    return tex;
+  }, []);
+
+  // Trunk Geometry: Tapering redwood trunk with vertex colors for moss blend
   const trunkGeometry = useMemo(() => {
-    // Top radius 0.45, bottom radius 0.85, height 1
-    const geom = new THREE.CylinderGeometry(0.45, 0.9, 1, 9, 4);
-    geom.translate(0, 0.5, 0); // Origin at base of trunk
+    const geom = new THREE.CylinderGeometry(0.42, 0.95, 1, 10, 8);
+    geom.translate(0, 0.5, 0); // Origin at base
+    const pos = geom.attributes.position;
+    const count = pos.count;
+    const colors = new Float32Array(count * 3);
+
+    const mossCol = new THREE.Color('#2d5a4a');  // Moss accent
+    const barkCol = new THREE.Color('#0a1f1a');  // Deep shadow bark
+
+    for (let i = 0; i < count; i++) {
+      const y = pos.getY(i);
+      // Moss concentrated on lower 35% of trunk
+      const mossFactor = Math.max(0.0, 1.0 - y * 2.8);
+      const c = new THREE.Color().lerpColors(barkCol, mossCol, mossFactor);
+      colors[i * 3] = c.r;
+      colors[i * 3 + 1] = c.g;
+      colors[i * 3 + 2] = c.b;
+    }
+    geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geom.computeVertexNormals();
     return geom;
   }, []);
 
-  // Geometry for foliage clusters (faceted icosahedron for stylized pine/cedar clusters)
+  // Trunk Material
+  const trunkMaterial = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      roughness: 0.92,
+      metalness: 0.08,
+      vertexColors: true,
+      normalMap: barkNormalMap || undefined,
+      normalScale: new THREE.Vector2(0.8, 0.8),
+    });
+  }, [barkNormalMap]);
+
+  // Foliage Geometry (icosahedron clusters)
   const foliageGeometry = useMemo(() => {
-    const geom = new THREE.IcosahedronGeometry(1.9, 2);
+    const geom = new THREE.IcosahedronGeometry(2.0, 2);
+    // Add instanceOffset attribute buffer for wind sway
+    const instanceOffsets = new Float32Array(treeCount * 3);
+    for (let i = 0; i < treeCount * 3; i++) {
+      instanceOffsets[i] = Math.random() * 25.0;
+    }
+    geom.setAttribute('aInstanceOffset', new THREE.InstancedBufferAttribute(instanceOffsets, 1));
     return geom;
+  }, [treeCount]);
+
+  // Overhead Sky-Occluding Canopy Geometry
+  const overheadCanopyGeometry = useMemo(() => {
+    return new THREE.IcosahedronGeometry(3.6, 2);
   }, []);
 
-  // Setup initial instance transformation matrices
-  useMemo(() => {
-    // We will populate these inside useEffect / ref callback or directly in render
-  }, []);
-
-  // Custom Foliage Shader Material with wind sway and leaf shimmer
+  // Custom Foliage Material with wind sway and warm amber backlit rim lighting
   const foliageMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
       uniforms: {
         uTime: { value: 0 },
-        uHoverShimmer: { value: 0 },
-        uSunDir: { value: new THREE.Vector3(0.5, 0.7, -0.4).normalize() },
-        uDeepColor: { value: new THREE.Color('#072417') },
-        uMidColor: { value: new THREE.Color('#145638') },
-        uSunColor: { value: new THREE.Color('#46a86e') },
-        uGoldRim: { value: new THREE.Color('#fcd34d') },
+        uDeepShadow: { value: new THREE.Color('#0a1f1a') },
+        uMidForest: { value: new THREE.Color('#1a3d2e') },
+        uMossAccent: { value: new THREE.Color('#2d5a4a') },
+        uWarmAmberRim: { value: new THREE.Color('#ffb347') },
+        uSunRayGold: { value: new THREE.Color('#c9a961') },
+        uSunDir: { value: new THREE.Vector3(14, 22, -42).normalize() },
       },
       vertexShader: /* glsl */ `
+        attribute float aInstanceOffset;
+
         uniform float uTime;
+        uniform vec3 uSunDir;
+
         varying vec3 vNormal;
         varying vec3 vWorldPos;
-        varying vec3 vViewPos;
+        varying vec3 vViewDir;
+        varying float vDistance;
 
         void main() {
           vNormal = normalize(normalMatrix * normal);
 
-          // Base position from instance matrix
           vec4 worldPos = instanceMatrix * vec4(position, 1.0);
 
-          // Wind sway calculation
-          // Trees sway more at top, grounded at base
-          float heightFactor = max(0.0, worldPos.y * 0.08);
-          float trunkSwayX = sin(uTime * 1.4 + worldPos.z * 0.15) * 0.35 * heightFactor;
-          float trunkSwayZ = cos(uTime * 1.1 + worldPos.x * 0.12) * 0.28 * heightFactor;
+          // EXACT MANDATED WIND SWAY FORMULA:
+          // pos.x += sin(time * 0.5 + pos.y * 0.3 + instanceOffset) * 0.05 * height
+          float height = max(0.2, worldPos.y);
+          float swayX = sin(uTime * 0.5 + worldPos.y * 0.3 + aInstanceOffset) * 0.05 * height;
+          float swayZ = cos(uTime * 0.4 + worldPos.y * 0.25 + aInstanceOffset) * 0.035 * height;
 
-          // High frequency leaf flutter
-          float leafFlutter = sin(uTime * 5.5 + position.x * 3.0 + position.y * 4.0) * 0.06;
-
-          worldPos.x += trunkSwayX + leafFlutter;
-          worldPos.z += trunkSwayZ + leafFlutter * 0.7;
+          worldPos.x += swayX;
+          worldPos.z += swayZ;
 
           vWorldPos = worldPos.xyz;
           vec4 mvPos = viewMatrix * worldPos;
-          vViewPos = -mvPos.xyz;
+          vViewDir = normalize(-mvPos.xyz);
+          vDistance = length(mvPos.xyz);
+
           gl_Position = projectionMatrix * mvPos;
         }
       `,
       fragmentShader: /* glsl */ `
         uniform float uTime;
-        uniform float uHoverShimmer;
+        uniform vec3 uDeepShadow;
+        uniform vec3 uMidForest;
+        uniform vec3 uMossAccent;
+        uniform vec3 uWarmAmberRim;
+        uniform vec3 uSunRayGold;
         uniform vec3 uSunDir;
-        uniform vec3 uDeepColor;
-        uniform vec3 uMidColor;
-        uniform vec3 uSunColor;
-        uniform vec3 uGoldRim;
 
         varying vec3 vNormal;
         varying vec3 vWorldPos;
-        varying vec3 vViewPos;
+        varying vec3 vViewDir;
+        varying float vDistance;
 
         void main() {
           vec3 N = normalize(vNormal);
-          vec3 V = normalize(vViewPos);
+          vec3 V = normalize(vViewDir);
           vec3 L = normalize(uSunDir);
 
-          // Diffuse lighting
+          // Direct light diffuse
           float NdotL = max(0.0, dot(N, L));
-          
-          // Ethereal golden hour rim lighting (backlight glow through needle leaves)
-          float rim = 1.0 - max(0.0, dot(N, V));
-          rim = pow(rim, 3.2);
 
-          // Multi-tone canopy gradient
-          vec3 leafColor = mix(uDeepColor, uMidColor, NdotL * 0.8 + 0.2);
-          leafColor = mix(leafColor, uSunColor, pow(NdotL, 2.0) * 0.6);
-          leafColor += uGoldRim * rim * 0.65;
+          // MANDATED BACKLIT RIM LIGHTING (Fresnel term, warm amber #ffb347)
+          float fresnel = 1.0 - max(0.0, dot(N, V));
+          float rim = pow(fresnel, 2.8);
 
-          // Interactive leaf shimmer when hovered
-          if (uHoverShimmer > 0.01) {
-            float wave = sin(vWorldPos.y * 2.0 - uTime * 4.0 + vWorldPos.x * 1.5);
-            wave = smoothstep(0.4, 0.95, wave);
-            vec3 shimmerColor = vec3(0.9, 0.85, 0.45);
-            leafColor = mix(leafColor, shimmerColor, wave * uHoverShimmer * 0.7);
-          }
+          // Base foliage color gradient
+          vec3 col = mix(uDeepShadow, uMidForest, NdotL * 0.7 + 0.3);
+          col = mix(col, uMossAccent, pow(NdotL, 1.8) * 0.5);
 
-          // Depth fog integration
-          float depth = length(vViewPos);
-          float fogFactor = smoothstep(20.0, 75.0, depth);
-          vec3 fogColor = vec3(0.02, 0.08, 0.06);
-          leafColor = mix(leafColor, fogColor, fogFactor * 0.8);
+          // Additive warm amber backlit rim glow through the leaves
+          col += uWarmAmberRim * rim * 1.1;
+          col += uSunRayGold * pow(NdotL, 3.0) * 0.4;
 
-          gl_FragColor = vec4(leafColor, 1.0);
+          // DISTANT FOGGED SILHOUETTES in the distance (pure #0a1f1a)
+          float silhouetteFactor = smoothstep(32.0, 68.0, vDistance);
+          col = mix(col, uDeepShadow, silhouetteFactor * 0.92);
+
+          gl_FragColor = vec4(col, 1.0);
         }
       `,
     });
   }, []);
 
-  // Trunk Bark Material
-  const trunkMaterial = useMemo(() => {
-    return new THREE.MeshStandardMaterial({
-      color: '#1b140f',
-      roughness: 0.95,
-      metalness: 0.05,
-    });
-  }, []);
-
-  // Set instance matrices on mounts
-  React.useEffect(() => {
-    if (!trunkMeshRef.current || !foliageMeshRef.current) return;
+  // Populate instance matrices on mount
+  useEffect(() => {
+    if (!trunkMeshRef.current || !foliageMeshRef.current || !overheadCanopyRef.current) return;
 
     const dummy = new THREE.Object3D();
     const foliageDummy = new THREE.Object3D();
+    const canopyDummy = new THREE.Object3D();
 
-    let foliageIndex = 0;
+    let fIdx = 0;
+    let cIdx = 0;
 
     treeData.forEach((t, i) => {
-      // 1. Position and scale Trunk
+      // 1. Trunk transform
       dummy.position.set(t.x, t.y, t.z);
       dummy.rotation.set(t.rotTilt, t.rotY, t.rotTilt * 0.5);
       dummy.scale.set(t.scaleXZ, t.scaleY, t.scaleXZ);
       dummy.updateMatrix();
       trunkMeshRef.current!.setMatrixAt(i, dummy.matrix);
 
-      // 2. Position Foliage tiers (3 tiers per tree)
+      // 2. Foliage clusters (3 tiers per tree)
       const tiers = [0.65, 0.85, 1.02];
       tiers.forEach((ratio, tierIdx) => {
-        const tierHeight = t.y + t.scaleY * ratio;
-        const tierScale = (1.1 - tierIdx * 0.22) * (t.scaleXZ * 1.8);
+        const h = t.y + t.scaleY * ratio;
+        const s = (1.15 - tierIdx * 0.22) * (t.scaleXZ * 1.9);
 
         foliageDummy.position.set(
-          t.x + (Math.sin(tierIdx * 2.1) * 0.3),
-          tierHeight,
-          t.z + (Math.cos(tierIdx * 2.1) * 0.3)
+          t.x + Math.sin(tierIdx * 2.2) * 0.35,
+          h,
+          t.z + Math.cos(tierIdx * 2.2) * 0.35
         );
-        foliageDummy.rotation.set(0.1 * tierIdx, t.rotY + tierIdx * 1.2, 0);
-        foliageDummy.scale.set(tierScale, tierScale * 0.9, tierScale);
+        foliageDummy.rotation.set(0.12 * tierIdx, t.rotY + tierIdx * 1.3, 0);
+        foliageDummy.scale.set(s, s * 0.92, s);
         foliageDummy.updateMatrix();
 
-        if (foliageIndex < treeCount * 3) {
-          foliageMeshRef.current!.setMatrixAt(foliageIndex, foliageDummy.matrix);
-          foliageIndex++;
+        if (fIdx < treeCount * 3) {
+          foliageMeshRef.current!.setMatrixAt(fIdx, foliageDummy.matrix);
+          fIdx++;
         }
       });
+
+      // 3. Dense overhead sky-occluding canopy layer on tall trees
+      if (t.scaleY > 20 && cIdx < 120) {
+        canopyDummy.position.set(t.x, t.y + t.scaleY * 1.05, t.z);
+        canopyDummy.rotation.set(0.2, t.rotY, 0.1);
+        canopyDummy.scale.set(t.scaleXZ * 2.6, t.scaleXZ * 1.8, t.scaleXZ * 2.6);
+        canopyDummy.updateMatrix();
+        overheadCanopyRef.current!.setMatrixAt(cIdx, canopyDummy.matrix);
+        cIdx++;
+      }
     });
 
     trunkMeshRef.current.instanceMatrix.needsUpdate = true;
     foliageMeshRef.current.instanceMatrix.needsUpdate = true;
+    overheadCanopyRef.current.instanceMatrix.needsUpdate = true;
   }, [treeData, treeCount]);
 
-  // Frame update for wind animation and hover shimmer interpolation
-  useFrame(({ clock }, delta) => {
-    if (!foliageMaterialRef.current) return;
-    foliageMaterialRef.current.uniforms.uTime.value = clock.getElapsedTime();
-
-    // Smoothly damp hover shimmer
-    const targetShimmer = hoveredTree ? 1.0 : 0.0;
-    const current = foliageMaterialRef.current.uniforms.uHoverShimmer.value;
-    foliageMaterialRef.current.uniforms.uHoverShimmer.value = THREE.MathUtils.damp(
-      current,
-      targetShimmer,
-      4.0,
-      delta
-    );
+  useFrame(({ clock }) => {
+    if (foliageMaterialRef.current) {
+      foliageMaterialRef.current.uniforms.uTime.value = clock.getElapsedTime();
+    }
   });
 
   return (
     <group>
-      {/* Instanced Trunks */}
+      {/* 320 Instanced Trunks */}
       <instancedMesh
         ref={trunkMeshRef}
         args={[trunkGeometry, trunkMaterial, treeCount]}
@@ -289,17 +350,23 @@ export function InstancedTrees() {
         receiveShadow
       />
 
-      {/* Instanced Canopy Foliage Clusters */}
+      {/* 960 Instanced Foliage Clusters with Wind Sway Shader */}
       <instancedMesh
         ref={foliageMeshRef}
         args={[foliageGeometry, foliageMaterial, treeCount * 3]}
         castShadow
         receiveShadow
-        onPointerOver={() => setHoveredTree(true)}
-        onPointerOut={() => setHoveredTree(false)}
       >
         <primitive object={foliageMaterial} ref={foliageMaterialRef} attach="material" />
       </instancedMesh>
+
+      {/* Dense Overhead Leaf Layer that Occludes the Sky */}
+      <instancedMesh
+        ref={overheadCanopyRef}
+        args={[overheadCanopyGeometry, foliageMaterial, 120]}
+        castShadow
+        receiveShadow
+      />
     </group>
   );
 }

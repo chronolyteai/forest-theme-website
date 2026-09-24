@@ -2,24 +2,25 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { LiquidLink } from './LiquidLink';
 import { useForestStore } from '@/store/useForestStore';
 import { forestAudio } from '@/utils/audioSynthesizer';
 
 export function CtaSection() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [formData, setFormData] = useState({ name: '', email: '', vision: '' });
+  const [formData, setFormData] = useState({ name: '', email: '', message: '' });
   const triggerBurst = useForestStore((s) => s.triggerBurst);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitted(true);
-    triggerBurst(0, 4, -10);
+    triggerBurst(0, 4, -12);
     forestAudio.playBurstChime();
     setTimeout(() => {
       setIsModalOpen(false);
       setSubmitted(false);
-      setFormData({ name: '', email: '', vision: '' });
+      setFormData({ name: '', email: '', message: '' });
     }, 2800);
   };
 
@@ -29,160 +30,137 @@ export function CtaSection() {
 
   return (
     <>
-      <section className="relative w-full min-h-screen flex flex-col justify-between px-6 sm:px-12 py-24 select-none pointer-events-none">
-        {/* Top spacer */}
-        <div className="h-6" />
+      <section className="relative w-full min-h-screen flex flex-col justify-between px-6 sm:px-14 py-24 select-none pointer-events-none">
+        <div className="h-4" />
 
-        {/* Center Climax: "Let's Build Your World" */}
+        {/* Center Climax */}
         <div className="my-auto max-w-4xl mx-auto text-center pointer-events-auto">
-          {/* Glowing Badge */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: false, amount: 0.3 }}
-            transition={{ duration: 0.8 }}
-            className="inline-flex items-center space-x-2.5 px-4 py-1.5 rounded-full border border-amber-400/40 bg-emerald-950/60 backdrop-blur-md mb-8 shadow-[0_0_20px_rgba(245,158,11,0.2)]"
-          >
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-            <span className="text-xs uppercase tracking-[0.3em] text-amber-200 font-sans font-medium">
-              Chapter 04 • Twilight Synthesis
-            </span>
-          </motion.div>
-
-          {/* Pulsing Climax Title */}
-          <motion.h2
-            initial={{ opacity: 0, y: 35 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: false, amount: 0.3 }}
-            transition={{ duration: 1.0, ease: [0.22, 1, 0.36, 1] }}
-            className="font-serif text-5xl sm:text-7xl lg:text-8xl font-light tracking-tight text-white leading-tight mb-8"
-          >
-            Let&apos;s Build <br />
-            <span className="italic font-normal bg-gradient-to-r from-amber-200 via-amber-300 to-emerald-200 bg-clip-text text-transparent animate-pulse-slow">
-              Your World.
-            </span>
-          </motion.h2>
-
-          {/* Subtitle */}
-          <motion.p
-            initial={{ opacity: 0, y: 25 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: false, amount: 0.3 }}
-            transition={{ duration: 0.9, delay: 0.2 }}
-            className="max-w-xl mx-auto text-base sm:text-lg text-emerald-100/80 font-sans font-light leading-relaxed mb-10"
-          >
-            From bespoke WebGL experiences to cinematic brand storytelling, we craft
-            digital sanctuaries that captivate, inspire, and endure.
-          </motion.p>
-
-          {/* Action Buttons */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: false, amount: 0.3 }}
-            transition={{ duration: 0.9, delay: 0.4 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+            transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+            className="text-xs uppercase tracking-[0.3em] text-[#c9a961] font-sans font-medium mb-6"
           >
-            {/* Primary Glowing Button */}
-            <button
-              onClick={() => {
-                setIsModalOpen(true);
-                forestAudio.playBurstChime();
-              }}
-              className="group relative px-9 py-4 rounded-full overflow-hidden border border-amber-300/70 bg-gradient-to-r from-amber-500/25 via-emerald-600/25 to-amber-500/25 backdrop-blur-md text-amber-100 font-serif text-xl tracking-widest transition-all duration-300 shadow-[0_0_30px_rgba(245,158,11,0.3)] hover:scale-105 hover:shadow-[0_0_45px_rgba(245,158,11,0.55)]"
-            >
-              <span className="relative z-10 flex items-center space-x-3">
-                <span>START A PROJECT</span>
-                <span className="text-amber-300 transition-transform group-hover:translate-x-1">→</span>
-              </span>
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-amber-300/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-            </button>
+            Chapter 04 // Twilight Horizon
+          </motion.div>
 
-            {/* Back to Canopy Summit */}
+          {/* Mandated Climax Title */}
+          <motion.h2
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false, amount: 0.3 }}
+            transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
+            className="font-serif text-5xl sm:text-7xl lg:text-8xl font-extralight tracking-tight text-[#e8dcc4] leading-tight mb-8"
+          >
+            Let&apos;s Build <br />
+            <span className="italic font-light text-[#ffb347] animate-pulse">
+              Your World.
+            </span>
+          </motion.h2>
+
+          <motion.p
+            initial={{ opacity: 0, y: 25 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false, amount: 0.3 }}
+            transition={{ duration: 1.0, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="max-w-xl mx-auto text-base sm:text-lg text-[#e8dcc4]/90 font-sans tracking-wide leading-relaxed mb-12"
+          >
+            We sculpt cinematic 3D digital realities, volumetric worlds, and interactive
+            stories engineered to leave audiences breathless.
+          </motion.p>
+
+          {/* Liquid Link CTA */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false, amount: 0.3 }}
+            transition={{ duration: 0.9, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-10"
+          >
+            <LiquidLink onClick={() => setIsModalOpen(true)}>
+              Initiate Collaboration →
+            </LiquidLink>
+
             <button
               onClick={scrollToTop}
-              className="px-7 py-4 rounded-full border border-emerald-800/60 bg-emerald-950/40 backdrop-blur-md text-emerald-200 text-xs tracking-widest uppercase font-sans hover:bg-emerald-900/50 hover:border-emerald-600 transition-all duration-300"
+              className="font-sans text-xs uppercase tracking-[0.25em] text-[#c9a961]/80 hover:text-[#ffb347] transition-colors"
             >
               Return to Summit ↑
             </button>
           </motion.div>
         </div>
 
-        {/* Footer info */}
-        <footer className="pt-12 border-t border-emerald-900/30 flex flex-col sm:flex-row items-center justify-between text-xs font-sans text-emerald-400/60 tracking-wider pointer-events-auto">
+        {/* Footer */}
+        <footer className="pt-12 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between text-xs font-sans text-[#e8dcc4]/60 tracking-wider pointer-events-auto">
           <div className="flex items-center space-x-3 mb-4 sm:mb-0">
-            <span className="text-amber-300 font-serif text-sm">SYLVANE SANCTUARY</span>
+            <span className="text-[#c9a961] font-serif text-sm">SYLVANE SANCTUARY</span>
             <span>•</span>
-            <span>CRAFTED FOR AWWWARDS SITE OF THE YEAR</span>
+            <span>AWWWARDS SOTD CALIBER</span>
           </div>
 
-          <div className="flex items-center space-x-6 text-[11px] uppercase tracking-widest text-emerald-300/70">
+          <div className="flex items-center space-x-6 text-[11px] uppercase tracking-widest text-[#2d5a4a]">
             <span>Next.js 14</span>
             <span>Three.js + R3F</span>
-            <span>Procedural Shaders</span>
-            <span>Web Audio API</span>
+            <span>Raymarched Volumetric Fog</span>
+            <span>Procedural Audio</span>
           </div>
         </footer>
       </section>
 
-      {/* Interactive Project Inquiry Modal */}
+      {/* Inquiry Modal */}
       <AnimatePresence>
         {isModalOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-xl"
             onClick={() => setIsModalOpen(false)}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/85 backdrop-blur-2xl pointer-events-auto"
           >
             <motion.div
-              initial={{ scale: 0.92, y: 30, opacity: 0 }}
+              initial={{ scale: 0.94, y: 30, opacity: 0 }}
               animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{ scale: 0.92, y: 20, opacity: 0 }}
-              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              exit={{ scale: 0.94, y: 20, opacity: 0 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
               onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-lg p-8 sm:p-10 rounded-2xl bg-[#051912] border border-amber-300/40 shadow-[0_25px_60px_rgba(0,0,0,0.8)] text-white overflow-hidden"
+              className="relative w-full max-w-lg p-8 sm:p-10 rounded-2xl bg-[#0a1f1a] border border-[#c9a961]/40 shadow-[0_30px_70px_rgba(0,0,0,0.9)] text-[#e8dcc4]"
             >
-              {/* Close button */}
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="absolute top-6 right-6 text-emerald-400 hover:text-amber-200 transition-colors text-lg"
-                aria-label="Close modal"
+                className="absolute top-6 right-6 text-[#c9a961] hover:text-[#ffb347] text-lg"
+                aria-label="Close"
               >
                 ✕
               </button>
 
               {submitted ? (
                 <div className="text-center py-10">
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="w-16 h-16 rounded-full bg-emerald-900/60 border border-amber-300/60 mx-auto flex items-center justify-center mb-6 text-amber-300 text-2xl shadow-[0_0_25px_rgba(245,158,11,0.4)]"
-                  >
+                  <div className="w-14 h-14 rounded-full border border-[#c9a961] text-[#ffb347] mx-auto flex items-center justify-center mb-5 text-2xl">
                     ✓
-                  </motion.div>
-                  <h3 className="font-serif text-3xl text-white mb-2 font-light">
-                    Your Beacon Has Been Received
+                  </div>
+                  <h3 className="font-serif text-3xl font-light text-[#e8dcc4] mb-2">
+                    Signal Transmitted
                   </h3>
-                  <p className="text-emerald-200/80 font-sans text-sm">
-                    The forest whispers back. Our architects will contact you shortly.
+                  <p className="text-sm font-sans text-[#e8dcc4]/80">
+                    The ancient glade echoes back. Our creative architects will reply shortly.
                   </p>
                 </div>
               ) : (
                 <div>
-                  <div className="text-xs uppercase tracking-[0.3em] text-amber-300 font-sans mb-2 font-medium">
+                  <div className="text-xs uppercase tracking-[0.3em] text-[#c9a961] font-sans font-medium mb-2">
                     Initiate Collaboration
                   </div>
-                  <h3 className="font-serif text-3xl sm:text-4xl text-white font-light tracking-tight mb-2">
-                    Let&apos;s Shape the Digital Wild
+                  <h3 className="font-serif text-3xl sm:text-4xl font-extralight text-[#e8dcc4] mb-2">
+                    Sculpt Your Digital Wild
                   </h3>
-                  <p className="text-emerald-200/70 text-sm font-sans mb-6">
+                  <p className="text-sm font-sans tracking-wide text-[#e8dcc4]/80 mb-6">
                     Tell us about your brand vision, 3D experience, or creative realm.
                   </p>
 
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                      <label className="block text-xs uppercase tracking-wider text-emerald-300/80 font-sans mb-1.5">
+                      <label className="block text-xs uppercase tracking-wider text-[#c9a961] font-sans mb-1.5">
                         Your Name
                       </label>
                       <input
@@ -190,13 +168,12 @@ export function CtaSection() {
                         required
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="Aurelia Vance"
-                        className="w-full px-4 py-2.5 rounded-lg bg-emerald-950/70 border border-emerald-800/60 text-white placeholder-emerald-700/60 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-all font-sans text-sm"
+                        placeholder="Elena Woods"
+                        className="w-full px-4 py-2.5 rounded-lg bg-black/40 border border-white/10 text-[#e8dcc4] placeholder-white/30 focus:outline-none focus:border-[#c9a961] font-sans text-sm"
                       />
                     </div>
-
                     <div>
-                      <label className="block text-xs uppercase tracking-wider text-emerald-300/80 font-sans mb-1.5">
+                      <label className="block text-xs uppercase tracking-wider text-[#c9a961] font-sans mb-1.5">
                         Email Address
                       </label>
                       <input
@@ -204,28 +181,27 @@ export function CtaSection() {
                         required
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="aurelia@domain.com"
-                        className="w-full px-4 py-2.5 rounded-lg bg-emerald-950/70 border border-emerald-800/60 text-white placeholder-emerald-700/60 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-all font-sans text-sm"
+                        placeholder="elena@sanctuary.design"
+                        className="w-full px-4 py-2.5 rounded-lg bg-black/40 border border-white/10 text-[#e8dcc4] placeholder-white/30 focus:outline-none focus:border-[#c9a961] font-sans text-sm"
                       />
                     </div>
-
                     <div>
-                      <label className="block text-xs uppercase tracking-wider text-emerald-300/80 font-sans mb-1.5">
+                      <label className="block text-xs uppercase tracking-wider text-[#c9a961] font-sans mb-1.5">
                         Vision & Timeline
                       </label>
                       <textarea
                         rows={3}
                         required
-                        value={formData.vision}
-                        onChange={(e) => setFormData({ ...formData, vision: e.target.value })}
-                        placeholder="We are launching an immersive 3D flagship for our upcoming collection…"
-                        className="w-full px-4 py-2.5 rounded-lg bg-emerald-950/70 border border-emerald-800/60 text-white placeholder-emerald-700/60 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-all font-sans text-sm resize-none"
+                        value={formData.message}
+                        onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                        placeholder="Building an immersive flagship experience for our global product launch…"
+                        className="w-full px-4 py-2.5 rounded-lg bg-black/40 border border-white/10 text-[#e8dcc4] placeholder-white/30 focus:outline-none focus:border-[#c9a961] font-sans text-sm resize-none"
                       />
                     </div>
 
                     <button
                       type="submit"
-                      className="w-full mt-2 py-3.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-sans font-medium text-sm uppercase tracking-widest transition-all duration-300 shadow-[0_0_20px_rgba(245,158,11,0.4)]"
+                      className="w-full mt-2 py-3.5 rounded-lg bg-[#c9a961] hover:bg-[#ffb347] text-[#0a1f1a] font-sans font-medium text-xs uppercase tracking-widest transition-colors duration-300 shadow-[0_0_20px_rgba(201,169,97,0.35)]"
                     >
                       Transmit Signal →
                     </button>
